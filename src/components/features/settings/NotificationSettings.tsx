@@ -11,9 +11,11 @@ import {
   showTestNotification 
 } from '@/utils/serviceWorker';
 import { Bell } from 'lucide-react';
+import { useNotifications } from '@/contexts/NotificationContext';
 
 const NotificationSettings = () => {
   const { user } = useAuth();
+  const { addNotification } = useNotifications();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
@@ -151,6 +153,36 @@ const NotificationSettings = () => {
     if (permission === 'granted') {
       showTestNotification();
       setShowPermissionPrompt(false);
+    }
+  };
+
+  const handleTestNotification = async () => {
+    // First check if notifications are supported and permission is granted
+    if (!areNotificationsSupported() || getNotificationPermission() !== 'granted') {
+      alert('Please enable notifications in your browser settings first.');
+      return;
+    }
+    
+    try {
+      // Show a system notification
+      await showTestNotification();
+      
+      // Add a notification to our context
+      addNotification(
+        'Test Notification',
+        'This is a test notification to verify your notification settings are working correctly.'
+      );
+      
+      // Show a success message
+      setSuccessMessage('Test notification sent!');
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => {
+        setSuccessMessage('');
+      }, 3000);
+    } catch (error) {
+      console.error('Error sending test notification:', error);
+      alert('Failed to send test notification. Please check browser permissions.');
     }
   };
 
@@ -384,13 +416,23 @@ const NotificationSettings = () => {
         </div>
         
         <div className="mt-6 flex items-center justify-between">
-          <button 
-            type="submit"
-            disabled={saving}
-            className="px-6 py-3 bg-primary text-white font-medium rounded-lg hover:bg-opacity-90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {saving ? 'Saving...' : 'Apply Changes'}
-          </button>
+          <div className="flex gap-3">
+            <button 
+              type="submit"
+              disabled={saving}
+              className="px-6 py-3 bg-primary text-white font-medium rounded-lg hover:bg-opacity-90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {saving ? 'Saving...' : 'Apply Changes'}
+            </button>
+            
+            <button 
+              type="button"
+              onClick={handleTestNotification}
+              className="px-6 py-3 bg-gray-100 text-gray-800 font-medium rounded-lg hover:bg-gray-200 transition-colors"
+            >
+              Test Notification
+            </button>
+          </div>
           
           {successMessage && (
             <div className="flex items-center text-green-600">
