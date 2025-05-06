@@ -1,0 +1,118 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import Header from '@/components/layout/Header';
+import Sidebar from '@/components/layout/Sidebar';
+import ProtectedRoute from '@/components/layout/ProtectedRoute';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import SpendingByCategory from '@/components/features/statistics/SpendingByCategory';
+import MonthlySpendingTrend from '@/components/features/statistics/MonthlySpendingTrend';
+import SubscriptionComparison from '@/components/features/statistics/SubscriptionComparison';
+import YearlyProjection from '@/components/features/statistics/YearlyProjection';
+import BudgetUtilization from '@/components/features/statistics/BudgetUtilization';
+import { getUserSubscriptions, getUserBudget } from '@/utils/firestore';
+import { Subscription, Budget } from '@/utils/types';
+import Link from 'next/link';
+
+export default function StatisticsPage() {
+  const { user } = useAuth();
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
+  const [budget, setBudget] = useState<Budget | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!user) return;
+      
+      try {
+        setLoading(true);
+        const userSubscriptions = await getUserSubscriptions(user.uid);
+        const userBudget = await getUserBudget(user.uid);
+        
+        setSubscriptions(userSubscriptions);
+        setBudget(userBudget);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchData();
+  }, [user]);
+
+  // Loading state
+  if (loading) {
+    return (
+      <ProtectedRoute>
+        <div className="flex min-h-screen bg-background">
+          <Sidebar />
+          <main className="flex-1 pl-[300px] p-10">
+            <div className="flex min-h-screen items-center justify-center">
+              <div className="w-8 h-8 border-t-2 border-b-2 border-primary rounded-full animate-spin"></div>
+            </div>
+          </main>
+        </div>
+      </ProtectedRoute>
+    );
+  }
+
+  return (
+    <ProtectedRoute>
+      <div className="flex min-h-screen bg-background">
+        <Sidebar />
+        <main className="flex-1 pl-[300px] p-10">
+          <div className="max-w-7xl mx-auto">
+            <Header />
+            
+            <div className="mb-10">
+              <h1 className="text-3xl font-bold">Subscription Statistics</h1>
+              <p className="text-gray-600 mt-2">Analyze your subscription spending patterns and trends.</p>
+            </div>
+            
+            {subscriptions.length === 0 ? (
+              <div className="bg-white rounded-xl p-10 shadow-sm text-center">
+                <p className="text-lg text-gray-600 mb-6">You don't have any subscriptions yet to generate statistics.</p>
+                <Link href="/subscriptions" className="px-6 py-3 bg-primary text-white font-medium rounded-lg hover:bg-opacity-90 transition-colors">
+                  Add Subscriptions
+                </Link>
+              </div>
+            ) : (
+              <Tabs defaultValue="overview" className="w-full">
+                <TabsList className="mb-8">
+                  <TabsTrigger value="overview">Overview</TabsTrigger>
+                  <TabsTrigger value="category">By Category</TabsTrigger>
+                  <TabsTrigger value="trends">Spending Trends</TabsTrigger>
+                  <TabsTrigger value="budget">Budget Analysis</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="overview" className="space-y-8">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <SpendingByCategory subscriptions={subscriptions} />
+                    <BudgetUtilization subscriptions={subscriptions} budget={budget} />
+                  </div>
+                  <YearlyProjection subscriptions={subscriptions} />
+                </TabsContent>
+                
+                <TabsContent value="category" className="space-y-8">
+                  <SpendingByCategory subscriptions={subscriptions} />
+                  <SubscriptionComparison subscriptions={subscriptions} />
+                </TabsContent>
+                
+                <TabsContent value="trends" className="space-y-8">
+                  <MonthlySpendingTrend subscriptions={subscriptions} />
+                </TabsContent>
+                
+                <TabsContent value="budget" className="space-y-8">
+                  <BudgetUtilization subscriptions={subscriptions} budget={budget} />
+                  <YearlyProjection subscriptions={subscriptions} />
+                </TabsContent>
+              </Tabs>
+            )}
+          </div>
+        </main>
+      </div>
+    </ProtectedRoute>
+  );
+} 
