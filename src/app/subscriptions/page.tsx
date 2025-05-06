@@ -39,6 +39,7 @@ export default function SubscriptionsPage() {
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [billingHistory, setBillingHistory] = useState<BillingRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [editingSubscription, setEditingSubscription] = useState<Subscription | null>(null);
   
   const [formData, setFormData] = useState<NewSubscriptionForm>({
     name: '',
@@ -138,6 +139,28 @@ export default function SubscriptionsPage() {
     return Object.keys(errors).length === 0;
   };
 
+  const handleEditSubscription = (subscription: Subscription) => {
+    // Set the subscription being edited
+    setEditingSubscription(subscription);
+    
+    // Format date as YYYY-MM-DD for the date input
+    const formattedDate = new Date(subscription.nextBilling).toISOString().split('T')[0];
+    
+    // Populate form with subscription data
+    setFormData({
+      name: subscription.name,
+      category: subscription.category,
+      price: subscription.price.toString(),
+      currency: subscription.currency,
+      billingCycle: subscription.billingCycle,
+      nextBilling: formattedDate,
+      notificationsEnabled: subscription.notificationsEnabled
+    });
+    
+    // Switch to add/edit tab
+    setActiveTab('add');
+  };
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     
@@ -146,10 +169,10 @@ export default function SubscriptionsPage() {
     }
     
     try {
-      // Create a new subscription - keep the original case of the name for the logo
-      const exactName = formData.name; // Preserve exact case for monogram
+      // Preserve exact case for monogram
+      const exactName = formData.name;
       
-      const newSubscription = {
+      const subscriptionData = {
         name: formData.name,
         provider: formData.name, // Using name as provider for now
         price: parseFloat(formData.price),
@@ -158,19 +181,29 @@ export default function SubscriptionsPage() {
         billingCycle: formData.billingCycle,
         nextBilling: formData.nextBilling,
         status: 'active' as const,
-        // Store the exact name for the monogram
         logo: exactName,
         notificationsEnabled: formData.notificationsEnabled
       };
       
-      // Add to firestore
-      await addSubscription(user.uid, newSubscription);
+      if (editingSubscription) {
+        // Update existing subscription
+        await updateSubscription(editingSubscription.id, subscriptionData);
+        
+        // Show success message
+        alert('Subscription updated successfully!');
+      } else {
+        // Add new subscription
+        await addSubscription(user.uid, subscriptionData);
+        
+        // Show success message
+        alert('Subscription added successfully!');
+      }
       
       // Refresh subscriptions
       const updatedSubscriptions = await getUserSubscriptions(user.uid);
       setSubscriptions(updatedSubscriptions);
       
-      // Reset form
+      // Reset form and editing state
       setFormData({
         name: '',
         category: 'Streaming',
@@ -180,15 +213,13 @@ export default function SubscriptionsPage() {
         nextBilling: '',
         notificationsEnabled: false
       });
+      setEditingSubscription(null);
       
       // Switch to all subscriptions tab
       setActiveTab('all');
-
-      // Show success message (could be replaced with a toast notification)
-      alert('Subscription added successfully!');
     } catch (error) {
-      console.error('Error adding subscription:', error);
-      alert('Failed to add subscription. Please try again.');
+      console.error('Error saving subscription:', error);
+      alert('Failed to save subscription. Please try again.');
     }
   };
 
@@ -387,7 +418,10 @@ export default function SubscriptionsPage() {
                           >
                             {subscription.notificationsEnabled ? <Bell size={16} /> : <BellOff size={16} />}
                           </button>
-                          <button className="text-sm text-gray-500 hover:text-primary transition-colors p-1.5 rounded-full hover:bg-primary hover:bg-opacity-10">
+                          <button 
+                            className="text-sm text-gray-500 hover:text-primary transition-colors p-1.5 rounded-full hover:bg-primary hover:bg-opacity-10"
+                            onClick={() => handleEditSubscription(subscription)}
+                          >
                             <Edit size={16} />
                           </button>
                           <button 
@@ -494,10 +528,12 @@ export default function SubscriptionsPage() {
               </div>
             )}
             
-            {/* Add Subscription */}
+            {/* Add/Edit Subscription */}
             {activeTab === 'add' && (
               <div className="bg-white rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
-                <h2 className="text-xl font-bold mb-6">Add New Subscription</h2>
+                <h2 className="text-xl font-bold mb-6">
+                  {editingSubscription ? 'Edit Subscription' : 'Add New Subscription'}
+                </h2>
                 
                 <form className="space-y-6" onSubmit={handleSubmit}>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -604,12 +640,24 @@ export default function SubscriptionsPage() {
                       type="submit"
                       className="px-6 py-3 bg-primary text-white font-medium rounded-lg hover:bg-opacity-90 transition-colors"
                     >
-                      Add Subscription
+                      {editingSubscription ? 'Update Subscription' : 'Add Subscription'}
                     </button>
                     <button 
                       type="button"
                       className="px-6 py-3 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 transition-colors"
-                      onClick={() => setActiveTab('all')}
+                      onClick={() => {
+                        setActiveTab('all');
+                        setEditingSubscription(null);
+                        setFormData({
+                          name: '',
+                          category: 'Streaming',
+                          price: '',
+                          currency: '€',
+                          billingCycle: 'Monthly',
+                          nextBilling: '',
+                          notificationsEnabled: false
+                        });
+                      }}
                     >
                       Cancel
                     </button>
