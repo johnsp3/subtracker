@@ -11,39 +11,48 @@ import MonthlySpendingTrend from '@/components/features/statistics/MonthlySpendi
 import SubscriptionComparison from '@/components/features/statistics/SubscriptionComparison';
 import YearlyProjection from '@/components/features/statistics/YearlyProjection';
 import BudgetUtilization from '@/components/features/statistics/BudgetUtilization';
-import { getUserSubscriptions, getUserBudget } from '@/utils/firestore';
-import { Subscription, Budget } from '@/utils/types';
+import { useSubscriptionViewModel } from '@/viewmodels/subscription/subscription.viewmodel';
+import { useBudgetViewModel } from '@/viewmodels/budget/budget.viewmodel';
 import Link from 'next/link';
+import { Subscription } from '@/models/subscription/subscription.model';
+import { Budget } from '@/models/budget/budget.model';
+
+// Define the component props explicitly to help TypeScript
+type SpendingByCategoryCompProps = {
+  subscriptions: Subscription[];
+  totalMonthlySpending: number;
+};
+
+type BudgetUtilizationCompProps = {
+  subscriptions: Subscription[];
+  budget: Budget | null;
+  totalMonthlySpending: number;
+};
+
+// TypeScript type assertion functions
+const asSpendingCategoryProps = (props: SpendingByCategoryCompProps): SpendingByCategoryCompProps => props;
+const asBudgetUtilizationProps = (props: BudgetUtilizationCompProps): BudgetUtilizationCompProps => props;
 
 export default function StatisticsPage() {
   const { user } = useAuth();
-  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
-  const [budget, setBudget] = useState<Budget | null>(null);
-  const [loading, setLoading] = useState(true);
+  
+  // Use viewmodels instead of direct service calls
+  const { 
+    subscriptions,
+    loading: subscriptionsLoading,
+    calculateTotalMonthlyCost
+  } = useSubscriptionViewModel(user?.uid || null);
+  
+  const {
+    budget,
+    loading: budgetLoading
+  } = useBudgetViewModel(user?.uid || null);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      if (!user) return;
-      
-      try {
-        setLoading(true);
-        const userSubscriptions = await getUserSubscriptions(user.uid);
-        const userBudget = await getUserBudget(user.uid);
-        
-        setSubscriptions(userSubscriptions);
-        setBudget(userBudget);
-      } catch (error) {
-        console.error('Error fetching data:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    fetchData();
-  }, [user]);
+  // Calculate the total monthly spending once when needed
+  const totalMonthlySpending = subscriptions.length > 0 ? calculateTotalMonthlyCost() : 0;
 
-  // Loading state
-  if (loading) {
+  // Loading state - when either subscriptions or budget is loading
+  if (subscriptionsLoading || budgetLoading) {
     return (
       <ProtectedRoute>
         <div className="flex min-h-screen bg-background">
@@ -89,14 +98,30 @@ export default function StatisticsPage() {
                 
                 <TabsContent value="overview" className="space-y-8">
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    <SpendingByCategory subscriptions={subscriptions} />
-                    <BudgetUtilization subscriptions={subscriptions} budget={budget} />
+                    <SpendingByCategory 
+                      {...asSpendingCategoryProps({
+                        subscriptions,
+                        totalMonthlySpending
+                      })}
+                    />
+                    <BudgetUtilization 
+                      {...asBudgetUtilizationProps({
+                        subscriptions,
+                        budget,
+                        totalMonthlySpending
+                      })}
+                    />
                   </div>
                   <YearlyProjection subscriptions={subscriptions} />
                 </TabsContent>
                 
                 <TabsContent value="category" className="space-y-8">
-                  <SpendingByCategory subscriptions={subscriptions} />
+                  <SpendingByCategory 
+                    {...asSpendingCategoryProps({
+                      subscriptions,
+                      totalMonthlySpending
+                    })}
+                  />
                   <SubscriptionComparison subscriptions={subscriptions} />
                 </TabsContent>
                 
@@ -105,7 +130,13 @@ export default function StatisticsPage() {
                 </TabsContent>
                 
                 <TabsContent value="budget" className="space-y-8">
-                  <BudgetUtilization subscriptions={subscriptions} budget={budget} />
+                  <BudgetUtilization 
+                    {...asBudgetUtilizationProps({
+                      subscriptions,
+                      budget,
+                      totalMonthlySpending
+                    })}
+                  />
                   <YearlyProjection subscriptions={subscriptions} />
                 </TabsContent>
               </Tabs>

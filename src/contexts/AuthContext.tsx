@@ -1,87 +1,131 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { 
-  User, 
-  signInWithPopup, 
-  signOut as firebaseSignOut,
-  onAuthStateChanged
-} from 'firebase/auth';
-import { auth, googleProvider } from '@/utils/firebase';
+/**
+ * Auth Context
+ * 
+ * Provides global authentication functionality throughout the application.
+ * Following the MVVM pattern, the context uses the auth view model instead of
+ * directly interacting with Firebase.
+ * Includes safeguards for server-side rendering.
+ */
+import { createContext, useContext, useEffect, ReactNode, useMemo, useCallback } from 'react';
+import { User } from 'firebase/auth';
+import { useToastContext } from './ToastContext';
 import { useRouter } from 'next/navigation';
+import { useAuthViewModel } from '@/viewmodels/auth/auth.viewmodel';
+import { AuthResult, UserProfile } from '@/models/auth/auth.model';
 
+/**
+ * Auth context type definition
+ */
 interface AuthContextType {
   user: User | null;
   loading: boolean;
+  error: string | null;
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
+  getUserProfile: () => UserProfile | null;
+  isAuthenticated: () => boolean;
+  isAdmin: () => boolean;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+// Empty handler functions for server-side rendering
+const noopAsync = async () => {};
+const noopReturn = () => null;
+const noopBoolean = () => false;
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+// Default context values for server-side rendering
+const defaultContextValue: AuthContextType = {
+  user: null,
+  loading: false,
+  error: null,
+  signInWithGoogle: noopAsync,
+  signOut: noopAsync,
+  getUserProfile: noopReturn,
+  isAuthenticated: noopBoolean,
+  isAdmin: noopBoolean
+};
+
+// Create the auth context with default values for SSR
+const AuthContext = createContext<AuthContextType>(defaultContextValue);
+
+/**
+ * Auth provider props
+ */
+interface AuthProviderProps {
+  children: ReactNode;
+}
+
+/**
+ * Auth Provider component
+ * 
+ * Wraps the application with authentication functionality
+ */
+export function AuthProvider({ children }: AuthProviderProps) {
+  // Use the auth view model
+  const { user, loading, error, signInWithGoogle: login, signOut: logout, getUserProfile, isAuthenticated, isAdmin, clearError } = useAuthViewModel();
   const router = useRouter();
+  const toast = useToastContext();
 
+  // Show error messages as toasts
   useEffect(() => {
-    // Listen for auth state changes
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      console.log("Auth state changed:", currentUser ? "user authenticated" : "no user");
-      setUser(currentUser);
-      setLoading(false);
-    }, (error) => {
-      console.error("Auth state error:", error);
-      setLoading(false);
-    });
+    if (error) {
+      toast.showError(error);
+      clearError();
+    }
+  }, [error, toast, clearError]);
 
-    // Cleanup subscription
-    return () => unsubscribe();
-  }, []);
-
-  const signInWithGoogle = async () => {
-    try {
-      setLoading(true);
-      await signInWithPopup(auth, googleProvider);
+  /**
+   * Sign in with Google and navigate to home page on success
+   * Wrapped in useCallback to prevent recreation on every render
+   */
+  const signInWithGoogle = useCallback(async (): Promise<void> => {
+    const result: AuthResult = await login();
+    
+    if (result.success) {
       router.push('/');
-    } catch (error) {
-      console.error('Error signing in with Google:', error);
-      setLoading(false);
+      toast.showSuccess('Signed in successfully');
     }
-  };
+  }, [login, router, toast]);
 
-  const signOut = async () => {
-    try {
-      // Set loading to prevent components from making Firebase calls
-      setLoading(true);
-      
-      // Sign out from Firebase
-      await firebaseSignOut(auth);
-      
-      // Navigate to login page immediately
+  /**
+   * Sign out and navigate to login page
+   * Wrapped in useCallback to prevent recreation on every render
+   */
+  const signOut = useCallback(async (): Promise<void> => {
+    const result: AuthResult = await logout();
+    
+    if (result.success) {
       router.push('/login');
-      
-      // Keep the loading state for a short time to prevent flickering
-      setTimeout(() => {
-        setLoading(false);
-      }, 500);
-    } catch (error) {
-      console.error('Error signing out:', error);
-      setLoading(false);
+      toast.showSuccess('Signed out successfully');
     }
-  };
+  }, [logout, router, toast]);
 
+  // Memoize context value to prevent unnecessary re-renders
+  const contextValue = useMemo(() => ({
+    user,
+    loading,
+    error,
+    signInWithGoogle,
+    signOut,
+    getUserProfile,
+    isAuthenticated,
+    isAdmin
+  }), [user, loading, error, signInWithGoogle, signOut, getUserProfile, isAuthenticated, isAdmin]);
+
+  // Provide the auth context
   return (
-    <AuthContext.Provider value={{ user, loading, signInWithGoogle, signOut }}>
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );
 }
 
+/**
+ * Custom hook to use the auth context
+ * 
+ * @returns The auth context
+ */
 export function useAuth() {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
+  return useContext(AuthContext);
 } 

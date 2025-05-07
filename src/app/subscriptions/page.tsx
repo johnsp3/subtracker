@@ -20,6 +20,7 @@ import {
   BillingRecord 
 } from '@/utils/types';
 import MonogramAvatar from '@/components/features/subscriptions/MonogramAvatar';
+import DualCurrencyDisplay from '@/components/ui/DualCurrencyDisplay';
 import { generateMonogram, generateBackgroundColor } from '@/utils/avatar';
 
 type NewSubscriptionForm = {
@@ -378,7 +379,9 @@ export default function SubscriptionsPage() {
                             </div>
                           </div>
                           <div className="flex flex-col items-end">
-                            <span className="font-bold">{subscription.currency}{subscription.price.toFixed(2)}</span>
+                            <span className="font-bold">
+                              <DualCurrencyDisplay amount={subscription.price} currency={subscription.currency} />
+                            </span>
                             <span className="text-sm text-gray-500">{subscription.billingCycle}</span>
                           </div>
                         </div>
@@ -444,35 +447,41 @@ export default function SubscriptionsPage() {
                     <div className="flex flex-col items-center justify-center py-6">
                       <p className="text-lg font-medium mb-2">Total Monthly Subscriptions</p>
                       <p className="text-3xl font-bold text-primary mb-4">
-                        {`${filteredSubscriptions[0]?.currency || "€"}${filteredSubscriptions
-                          .filter(s => s.status === 'active')
-                          .reduce((total, sub) => {
-                            // Normalize to monthly cost
-                            let monthlyCost = sub.price;
-                            if (sub.billingCycle === 'Yearly') {
-                              monthlyCost = sub.price / 12;
-                            } else if (sub.billingCycle === 'Quarterly') {
-                              monthlyCost = sub.price / 3;
-                            }
-                            return total + monthlyCost;
-                          }, 0)
-                          .toFixed(2)}`}
+                        <DualCurrencyDisplay 
+                          amount={filteredSubscriptions
+                            .filter(s => s.status === 'active')
+                            .reduce((total, sub) => {
+                              // Normalize to monthly cost
+                              let monthlyCost = sub.price;
+                              if (sub.billingCycle === 'Yearly') {
+                                monthlyCost = sub.price / 12;
+                              } else if (sub.billingCycle === 'Quarterly') {
+                                monthlyCost = sub.price / 3;
+                              }
+                              return total + monthlyCost;
+                            }, 0)}
+                          currency={filteredSubscriptions[0]?.currency || "€"}
+                          size="lg"
+                        />
                       </p>
                       <p className="text-sm text-gray-500">
-                        You're spending an average of 
-                        {` ${filteredSubscriptions[0]?.currency || "€"}${(filteredSubscriptions
-                          .filter(s => s.status === 'active')
-                          .reduce((total, sub) => {
-                            // Normalize to monthly cost
-                            let monthlyCost = sub.price;
-                            if (sub.billingCycle === 'Yearly') {
-                              monthlyCost = sub.price / 12;
-                            } else if (sub.billingCycle === 'Quarterly') {
-                              monthlyCost = sub.price / 3;
-                            }
-                            return total + monthlyCost;
-                          }, 0) / 30)
-                          .toFixed(2)}`} per day on subscriptions.
+                        You're spending an average of{' '}
+                        <DualCurrencyDisplay
+                          amount={(filteredSubscriptions
+                            .filter(s => s.status === 'active')
+                            .reduce((total, sub) => {
+                              // Normalize to monthly cost
+                              let monthlyCost = sub.price;
+                              if (sub.billingCycle === 'Yearly') {
+                                monthlyCost = sub.price / 12;
+                              } else if (sub.billingCycle === 'Quarterly') {
+                                monthlyCost = sub.price / 3;
+                              }
+                              return total + monthlyCost;
+                            }, 0) / 30)}
+                          currency={filteredSubscriptions[0]?.currency || "€"}
+                          size="sm"
+                        /> per day on subscriptions.
                       </p>
                     </div>
                   </div>

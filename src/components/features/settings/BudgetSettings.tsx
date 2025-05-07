@@ -2,16 +2,22 @@
 
 import { useState, useEffect, FormEvent } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { getUserBudget, updateUserBudget } from '@/utils/firestore';
-import { Budget } from '@/utils/types';
 import { Wallet } from 'lucide-react';
+import { useBudgetViewModel } from '@/viewmodels/budget/budget.viewmodel';
 
 const BudgetSettings = () => {
   const { user } = useAuth();
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
-  const [budget, setBudget] = useState<Budget | null>(null);
+  
+  // Use the budget view model instead of direct service calls
+  const {
+    budget,
+    loading,
+    error,
+    clearError,
+    updateBudget
+  } = useBudgetViewModel(user?.uid || null);
   
   const [formData, setFormData] = useState({
     monthlyBudget: '',
@@ -21,31 +27,24 @@ const BudgetSettings = () => {
   const [formErrors, setFormErrors] = useState<{
     monthlyBudget?: string;
   }>({});
-
+  
+  // Show error from view model as an alert
   useEffect(() => {
-    const fetchBudget = async () => {
-      if (!user) return;
-      
-      try {
-        setLoading(true);
-        const userBudget = await getUserBudget(user.uid);
-        
-        if (userBudget) {
-          setBudget(userBudget);
-          setFormData({
-            monthlyBudget: userBudget.monthlyBudget.toString(),
-            currency: userBudget.currency
-          });
-        }
-      } catch (error) {
-        console.error('Error fetching budget:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    fetchBudget();
-  }, [user]);
+    if (error) {
+      alert(error);
+      clearError();
+    }
+  }, [error, clearError]);
+
+  // Initialize form data when budget is loaded
+  useEffect(() => {
+    if (budget) {
+      setFormData({
+        monthlyBudget: budget.monthlyBudget.toString(),
+        currency: budget.currency
+      });
+    }
+  }, [budget]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -83,26 +82,21 @@ const BudgetSettings = () => {
     try {
       setSaving(true);
       
-      // Update budget in Firestore
-      await updateUserBudget(budget.id, {
+      // Use the view model to update the budget
+      const success = await updateBudget({
         monthlyBudget: parseFloat(formData.monthlyBudget),
         currency: formData.currency
       });
       
-      // Update local state
-      setBudget({
-        ...budget,
-        monthlyBudget: parseFloat(formData.monthlyBudget),
-        currency: formData.currency
-      });
-      
-      // Show success message
-      setSuccessMessage('Budget updated successfully!');
-      
-      // Clear success message after 3 seconds
-      setTimeout(() => {
-        setSuccessMessage('');
-      }, 3000);
+      if (success) {
+        // Show success message
+        setSuccessMessage('Budget updated successfully!');
+        
+        // Clear success message after 3 seconds
+        setTimeout(() => {
+          setSuccessMessage('');
+        }, 3000);
+      }
     } catch (error) {
       console.error('Error updating budget:', error);
     } finally {

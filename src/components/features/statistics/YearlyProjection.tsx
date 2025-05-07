@@ -2,6 +2,8 @@
 
 import React, { useMemo } from 'react';
 import { Subscription } from '@/utils/types';
+import MonogramAvatar from '@/components/features/subscriptions/MonogramAvatar';
+import DualCurrencyDisplay from '@/components/ui/DualCurrencyDisplay';
 
 interface YearlyProjectionProps {
   subscriptions: Subscription[];
@@ -107,8 +109,11 @@ const YearlyProjection: React.FC<YearlyProjectionProps> = ({ subscriptions }) =>
         <div className="text-right">
           <span className="text-sm text-gray-500">Total for {new Date().getFullYear()}</span>
           <p className="text-2xl font-bold text-primary">
-            {activeSubscriptions.length > 0 ? activeSubscriptions[0].currency : '€'}
-            {projectionData.yearly.toFixed(2)}
+            <DualCurrencyDisplay 
+              amount={projectionData.yearly} 
+              currency={activeSubscriptions.length > 0 ? activeSubscriptions[0].currency : '€'} 
+              size="lg"
+            />
           </p>
         </div>
       </div>
@@ -138,8 +143,11 @@ const YearlyProjection: React.FC<YearlyProjectionProps> = ({ subscriptions }) =>
                   {month.name}
                 </div>
                 <div className="text-[10px] text-gray-400 hidden sm:block">
-                  {activeSubscriptions.length > 0 ? activeSubscriptions[0].currency : '€'}
-                  {month.spending.toFixed(0)}
+                  <DualCurrencyDisplay 
+                    amount={month.spending} 
+                    currency={activeSubscriptions.length > 0 ? activeSubscriptions[0].currency : '€'} 
+                    size="sm" 
+                  />
                 </div>
               </div>
             ))}
@@ -149,19 +157,32 @@ const YearlyProjection: React.FC<YearlyProjectionProps> = ({ subscriptions }) =>
           <div className="absolute left-0 right-0 top-0 bottom-12 flex flex-col justify-between pointer-events-none">
             <div className="w-full border-t border-gray-100 relative">
               <span className="absolute -top-2 right-0 text-[10px] text-gray-400">
-                {activeSubscriptions.length > 0 ? activeSubscriptions[0].currency : '€'}
-                {maxMonthlySpending.toFixed(0)}
+                <DualCurrencyDisplay 
+                  amount={maxMonthlySpending} 
+                  currency={activeSubscriptions.length > 0 ? activeSubscriptions[0].currency : '€'} 
+                  size="sm" 
+                  showSecondary={false}
+                />
               </span>
             </div>
             <div className="w-full border-t border-gray-100 relative">
               <span className="absolute -top-2 right-0 text-[10px] text-gray-400">
-                {activeSubscriptions.length > 0 ? activeSubscriptions[0].currency : '€'}
-                {(maxMonthlySpending / 2).toFixed(0)}
+                <DualCurrencyDisplay 
+                  amount={maxMonthlySpending / 2} 
+                  currency={activeSubscriptions.length > 0 ? activeSubscriptions[0].currency : '€'} 
+                  size="sm" 
+                  showSecondary={false}
+                />
               </span>
             </div>
             <div className="w-full border-t border-gray-100 relative">
               <span className="absolute -top-2 right-0 text-[10px] text-gray-400">
-                {activeSubscriptions.length > 0 ? activeSubscriptions[0].currency : '€'}0
+                <DualCurrencyDisplay 
+                  amount={0} 
+                  currency={activeSubscriptions.length > 0 ? activeSubscriptions[0].currency : '€'} 
+                  size="sm" 
+                  showSecondary={false}
+                />
               </span>
             </div>
           </div>
@@ -172,22 +193,28 @@ const YearlyProjection: React.FC<YearlyProjectionProps> = ({ subscriptions }) =>
         <div className="bg-gray-50 p-3 rounded-lg">
           <span className="text-sm text-gray-500 block">Average / Month</span>
           <span className="text-lg font-semibold">
-            {activeSubscriptions.length > 0 ? activeSubscriptions[0].currency : '€'}
-            {(projectionData.yearly / 12).toFixed(2)}
+            <DualCurrencyDisplay 
+              amount={projectionData.yearly / 12} 
+              currency={activeSubscriptions.length > 0 ? activeSubscriptions[0].currency : '€'} 
+            />
           </span>
         </div>
         <div className="bg-gray-50 p-3 rounded-lg">
           <span className="text-sm text-gray-500 block">Highest Month</span>
           <span className="text-lg font-semibold">
-            {activeSubscriptions.length > 0 ? activeSubscriptions[0].currency : '€'}
-            {Math.max(...projectionData.monthly.map(m => m.spending)).toFixed(2)}
+            <DualCurrencyDisplay 
+              amount={Math.max(...projectionData.monthly.map(m => m.spending))} 
+              currency={activeSubscriptions.length > 0 ? activeSubscriptions[0].currency : '€'} 
+            />
           </span>
         </div>
         <div className="bg-gray-50 p-3 rounded-lg">
           <span className="text-sm text-gray-500 block">Lowest Month</span>
           <span className="text-lg font-semibold">
-            {activeSubscriptions.length > 0 ? activeSubscriptions[0].currency : '€'}
-            {Math.min(...projectionData.monthly.map(m => m.spending)).toFixed(2)}
+            <DualCurrencyDisplay 
+              amount={Math.min(...projectionData.monthly.map(m => m.spending))} 
+              currency={activeSubscriptions.length > 0 ? activeSubscriptions[0].currency : '€'} 
+            />
           </span>
         </div>
       </div>

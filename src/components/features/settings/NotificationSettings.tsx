@@ -2,8 +2,8 @@
 
 import { useState, useEffect, FormEvent } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { getUserSettings, updateUserSettings } from '@/utils/firestore';
-import { NotificationDay, UserSettings } from '@/utils/types';
+import { NotificationDay } from '@/models/user/user-settings.model';
+import { useUserSettingsViewModel } from '@/viewmodels/user/user-settings.viewmodel';
 import { 
   areNotificationsSupported, 
   getNotificationPermission, 
@@ -16,10 +16,22 @@ import { useNotifications } from '@/contexts/NotificationContext';
 const NotificationSettings = () => {
   const { user } = useAuth();
   const { addNotification } = useNotifications();
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
-  const [userSettings, setUserSettings] = useState<UserSettings | null>(null);
+  
+  // Use the user settings view model instead of direct service calls
+  const {
+    settings,
+    loading,
+    error,
+    clearError,
+    updateNotificationPreferences,
+    toggleGlobalNotifications,
+    updateNotificationDays,
+    toggleBrowserNotifications,
+    toggleSystemNotifications,
+    getNotificationSettingsDisplay
+  } = useUserSettingsViewModel(user?.uid || null);
   
   const [formData, setFormData] = useState({
     enabled: false,
@@ -30,6 +42,14 @@ const NotificationSettings = () => {
 
   const [permissionStatus, setPermissionStatus] = useState<NotificationPermission>('default');
   const [showPermissionPrompt, setShowPermissionPrompt] = useState(false);
+
+  // Show error message if there's an error from the view model
+  useEffect(() => {
+    if (error) {
+      alert(error);
+      clearError();
+    }
+  }, [error, clearError]);
 
   // Check notification permission status on component mount and re-check on focus
   useEffect(() => {
@@ -56,41 +76,26 @@ const NotificationSettings = () => {
     return () => window.removeEventListener('focus', handleFocus);
   }, [formData.enabled, formData.browserNotifications, formData.systemNotifications]);
 
+  // Initialize form data when settings are loaded
   useEffect(() => {
-    const fetchSettings = async () => {
-      if (!user) return;
+    if (settings) {
+      setFormData({
+        enabled: settings.notifications.enabled,
+        daysBeforeRenewal: settings.notifications.daysBeforeRenewal,
+        browserNotifications: settings.notifications.browserNotifications,
+        systemNotifications: settings.notifications.systemNotifications
+      });
       
-      try {
-        setLoading(true);
-        const settings = await getUserSettings(user.uid);
-        
-        if (settings) {
-          setUserSettings(settings);
-          setFormData({
-            enabled: settings.notifications.enabled,
-            daysBeforeRenewal: settings.notifications.daysBeforeRenewal,
-            browserNotifications: settings.notifications.browserNotifications,
-            systemNotifications: settings.notifications.systemNotifications
-          });
-          
-          // If user has notifications enabled, check permission status
-          if (settings.notifications.enabled && 
-              (settings.notifications.browserNotifications || settings.notifications.systemNotifications)) {
-            const currentPermission = getNotificationPermission();
-            if (currentPermission !== 'granted') {
-              setShowPermissionPrompt(true);
-            }
-          }
+      // If user has notifications enabled, check permission status
+      if (settings.notifications.enabled && 
+          (settings.notifications.browserNotifications || settings.notifications.systemNotifications)) {
+        const currentPermission = getNotificationPermission();
+        if (currentPermission !== 'granted') {
+          setShowPermissionPrompt(true);
         }
-      } catch (error) {
-        console.error('Error fetching notification settings:', error);
-      } finally {
-        setLoading(false);
       }
-    };
-    
-    fetchSettings();
-  }, [user]);
+    }
+  }, [settings]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, checked, type } = e.target;
@@ -189,7 +194,7 @@ const NotificationSettings = () => {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     
-    if (!user || !userSettings) {
+    if (!user || !settings) {
       return;
     }
     
@@ -231,37 +236,26 @@ const NotificationSettings = () => {
         }
       }
       
-      // Update settings in Firestore
-      await updateUserSettings(userSettings.id, {
-        notifications: {
-          enabled: formData.enabled,
-          daysBeforeRenewal: formData.daysBeforeRenewal,
-          browserNotifications: formData.browserNotifications && permissionStatus === 'granted',
-          systemNotifications: formData.systemNotifications && permissionStatus === 'granted'
-        }
+      // Use the view model to update notification preferences
+      const success = await updateNotificationPreferences({
+        enabled: formData.enabled,
+        daysBeforeRenewal: formData.daysBeforeRenewal,
+        browserNotifications: formData.browserNotifications && permissionStatus === 'granted',
+        systemNotifications: formData.systemNotifications && permissionStatus === 'granted'
       });
       
-      // Update local state
-      setUserSettings({
-        ...userSettings,
-        notifications: {
-          enabled: formData.enabled,
-          daysBeforeRenewal: formData.daysBeforeRenewal,
-          browserNotifications: formData.browserNotifications && permissionStatus === 'granted',
-          systemNotifications: formData.systemNotifications && permissionStatus === 'granted'
-        }
-      });
-      
-      // Show success message
-      setSuccessMessage('Notification settings updated successfully!');
-      
-      // Hide permission prompt
-      setShowPermissionPrompt(false);
-      
-      // Clear success message after 3 seconds
-      setTimeout(() => {
-        setSuccessMessage('');
-      }, 3000);
+      if (success) {
+        // Show success message
+        setSuccessMessage('Notification settings updated successfully!');
+        
+        // Hide permission prompt
+        setShowPermissionPrompt(false);
+        
+        // Clear success message after 3 seconds
+        setTimeout(() => {
+          setSuccessMessage('');
+        }, 3000);
+      }
     } catch (error) {
       console.error('Error updating notification settings:', error);
     } finally {

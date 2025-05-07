@@ -3,8 +3,10 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Tv, Music, ShoppingBag, Lightbulb, Car, Home, Gamepad2, MoreHorizontal } from 'lucide-react';
-import { getUserSubscriptions, getUserBudget, calculateMonthlySubscriptionCost } from '@/utils/firestore';
-import { Subscription, SubscriptionCategory } from '@/utils/types';
+import { SubscriptionCategory } from '@/models/subscription/subscription.model';
+import { useSubscriptionViewModel } from '@/viewmodels/subscription/subscription.viewmodel';
+import { useBudgetViewModel } from '@/viewmodels/budget/budget.viewmodel';
+import DualCurrencyDisplay from '@/components/ui/DualCurrencyDisplay';
 
 type CategoryWithIcon = {
   name: SubscriptionCategory;
@@ -16,12 +18,23 @@ type CategoryWithIcon = {
 
 const SubscriptionCategories = () => {
   const { user, loading: authLoading } = useAuth();
-  const [loading, setLoading] = useState(true);
   const [categories, setCategories] = useState<CategoryWithIcon[]>([]);
   const [totals, setTotals] = useState({
     budget: 1000.00, // Default budget
     subscriptions: 0
   });
+
+  // Use viewmodels instead of direct service calls
+  const { 
+    subscriptions, 
+    loading: subscriptionsLoading,
+    calculateTotalMonthlyCost
+  } = useSubscriptionViewModel(user?.uid || null);
+  
+  const {
+    budget,
+    loading: budgetLoading
+  } = useBudgetViewModel(user?.uid || null);
 
   // Category icons and colors mapping - wrapped in useMemo to prevent recreation on each render
   const categoryMappings = useMemo(() => ({
@@ -35,9 +48,11 @@ const SubscriptionCategories = () => {
     'Other': { icon: <MoreHorizontal size={18} />, color: 'bg-gray-500' }
   }), []);
 
-  const processSubscriptions = useCallback((subscriptions: Subscription[], budgetAmount: number) => {
+  const processSubscriptions = useCallback(() => {
+    if (!subscriptions) return;
+    
     // Group subscriptions by category
-    const categoryGroups: Record<SubscriptionCategory, Subscription[]> = {} as Record<SubscriptionCategory, Subscription[]>;
+    const categoryGroups: Record<SubscriptionCategory, any[]> = {} as Record<SubscriptionCategory, any[]>;
     
     // Initialize all categories
     Object.keys(categoryMappings).forEach(cat => {
@@ -88,8 +103,11 @@ const SubscriptionCategories = () => {
       return amountB - amountA;
     });
     
-    // Calculate total monthly subscription cost
-    const totalSubscriptionCost = calculateMonthlySubscriptionCost(subscriptions);
+    // Get the budget amount
+    const budgetAmount = budget?.monthlyBudget || 1000.00;
+    
+    // Calculate total monthly subscription cost using the viewmodel function
+    const totalSubscriptionCost = calculateTotalMonthlyCost();
     
     // Update state
     setCategories(categoriesWithAmount);
@@ -97,7 +115,7 @@ const SubscriptionCategories = () => {
       budget: budgetAmount,
       subscriptions: totalSubscriptionCost
     });
-  }, [categoryMappings]);
+  }, [subscriptions, budget, calculateTotalMonthlyCost, categoryMappings]);
 
   useEffect(() => {
     // If auth is loading (including during logout), reset component state
@@ -110,50 +128,36 @@ const SubscriptionCategories = () => {
       return;
     }
 
-    const fetchUserData = async () => {
-      // If user is null (logged out), reset state and stop loading
-      if (!user) {
-        setLoading(false);
-        setCategories([]);
-        setTotals({
-          budget: 1000.00,
-          subscriptions: 0
-        });
-        return;
-      }
+    // If user is null (logged out), reset state
+    if (!user) {
+      setCategories([]);
+      setTotals({
+        budget: 1000.00,
+        subscriptions: 0
+      });
+      return;
+    }
 
-      try {
-        setLoading(true);
-
-        // Get user's subscriptions
-        const subscriptions = await getUserSubscriptions(user.uid);
-        
-        // Get user's budget
-        const budget = await getUserBudget(user.uid);
-
-        // Process categories based on actual subscriptions
-        processSubscriptions(subscriptions, budget?.monthlyBudget || 1000.00);
-      } catch (error) {
-        console.error('Error fetching user data:', error);
-        // Reset to default values on error
-        setCategories([]);
-        setTotals({
-          budget: 1000.00,
-          subscriptions: 0
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchUserData();
-  }, [user, processSubscriptions, authLoading]);
+    // Process data once subscriptions and budget are loaded
+    if (!subscriptionsLoading && !budgetLoading) {
+      processSubscriptions();
+    }
+  }, [
+    user, 
+    authLoading, 
+    subscriptions,
+    budget,
+    subscriptionsLoading,
+    budgetLoading,
+    processSubscriptions
+  ]);
 
   const getBudgetPercentage = () => {
     return ((totals.subscriptions / totals.budget) * 100).toFixed(1);
   };
   
-  if (authLoading || loading) {
+  // Show loading spinner if any data is still loading
+  if (authLoading || subscriptionsLoading || budgetLoading) {
     return (
       <div className="bg-white rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
         <div className="flex items-center justify-center p-8">
@@ -177,7 +181,11 @@ const SubscriptionCategories = () => {
       ) : (
         <div className="space-y-4">
           {categories.map((category) => (
-            <div key={category.name} className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg transition-colors">
+            <div 
+              key={category.name} 
+              className="relative z-10 flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg transition-colors overflow-hidden"
+              style={{ position: 'relative' }}
+            >
               <div className="flex items-center gap-3">
                 <div className={`w-8 h-8 rounded-lg ${category.color} flex items-center justify-center text-white`}>
                   {category.icon}
@@ -199,11 +207,15 @@ const SubscriptionCategories = () => {
         <div className="flex justify-between items-center">
           <div>
             <p className="text-sm text-gray-500">Monthly Budget</p>
-            <p className="text-xl font-bold mt-1">€{totals.budget.toFixed(2)}</p>
+            <p className="text-xl font-bold mt-1">
+              <DualCurrencyDisplay amount={totals.budget} currency={budget?.currency || '€'} />
+            </p>
           </div>
           <div>
             <p className="text-sm text-gray-500">Total Subscriptions</p>
-            <p className="text-xl font-bold mt-1">€{totals.subscriptions.toFixed(2)}</p>
+            <p className="text-xl font-bold mt-1">
+              <DualCurrencyDisplay amount={totals.subscriptions} currency={budget?.currency || '€'} />
+            </p>
           </div>
         </div>
         <div className="mt-4 bg-gray-100 h-2 rounded-full overflow-hidden">

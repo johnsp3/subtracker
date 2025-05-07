@@ -1,14 +1,17 @@
 'use client';
 
 import React, { useMemo } from 'react';
-import { Subscription, SubscriptionCategory } from '@/utils/types';
-import { calculateMonthlySubscriptionCost } from '@/utils/firestore';
+import { Subscription, SubscriptionCategory } from '@/models/subscription/subscription.model';
 
 interface SpendingByCategoryProps {
   subscriptions: Subscription[];
+  totalMonthlySpending: number;
 }
 
-const SpendingByCategory: React.FC<SpendingByCategoryProps> = ({ subscriptions }) => {
+const SpendingByCategory: React.FC<SpendingByCategoryProps> = ({ 
+  subscriptions,
+  totalMonthlySpending
+}) => {
   // Only include active subscriptions
   const activeSubscriptions = useMemo(() => 
     subscriptions.filter(sub => sub.status === 'active'),
@@ -45,9 +48,6 @@ const SpendingByCategory: React.FC<SpendingByCategoryProps> = ({ subscriptions }
       .filter(([_, amount]) => amount > 0)
       .sort((a, b) => b[1] - a[1]); // Sort by amount, descending
   }, [activeSubscriptions]);
-
-  // Calculate total monthly spending
-  const totalMonthlySpending = calculateMonthlySubscriptionCost(activeSubscriptions);
   
   // Generate colors for categories
   const categoryColors: Record<string, string> = {

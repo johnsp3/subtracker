@@ -2,6 +2,7 @@
 
 import React, { useMemo } from 'react';
 import { Subscription } from '@/utils/types';
+import DualCurrencyDisplay from '@/components/ui/DualCurrencyDisplay';
 
 interface MonthlySpendingTrendProps {
   subscriptions: Subscription[];
@@ -197,22 +198,28 @@ const MonthlySpendingTrend: React.FC<MonthlySpendingTrendProps> = ({ subscriptio
             <div>
               <span className="text-sm text-gray-500">Average monthly spend:</span>
               <span className="block text-lg font-semibold">
-                {activeSubscriptions.length > 0 ? activeSubscriptions[0].currency : '€'}
-                {(trendData.reduce((total, data) => total + data.spending, 0) / trendData.length).toFixed(2)}
+                <DualCurrencyDisplay 
+                  amount={trendData.reduce((total, data) => total + data.spending, 0) / trendData.length} 
+                  currency={activeSubscriptions.length > 0 ? activeSubscriptions[0].currency : '€'} 
+                />
               </span>
             </div>
             <div>
               <span className="text-sm text-gray-500">Current month:</span>
               <span className="block text-lg font-semibold">
-                {activeSubscriptions.length > 0 ? activeSubscriptions[0].currency : '€'}
-                {trendData.find(data => data.isCurrentMonth)?.spending.toFixed(2) || '0.00'}
+                <DualCurrencyDisplay 
+                  amount={trendData.find(data => data.isCurrentMonth)?.spending || 0} 
+                  currency={activeSubscriptions.length > 0 ? activeSubscriptions[0].currency : '€'} 
+                />
               </span>
             </div>
             <div>
               <span className="text-sm text-gray-500">Projected next month:</span>
               <span className="block text-lg font-semibold">
-                {activeSubscriptions.length > 0 ? activeSubscriptions[0].currency : '€'}
-                {trendData.find((data, i) => i === trendData.findIndex(d => d.isCurrentMonth) + 1)?.spending.toFixed(2) || '0.00'}
+                <DualCurrencyDisplay 
+                  amount={trendData.find((data, i) => i === trendData.findIndex(d => d.isCurrentMonth) + 1)?.spending || 0} 
+                  currency={activeSubscriptions.length > 0 ? activeSubscriptions[0].currency : '€'} 
+                />
               </span>
             </div>
           </div>

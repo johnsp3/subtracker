@@ -3,6 +3,7 @@
 import React, { useMemo } from 'react';
 import { Subscription } from '@/utils/types';
 import MonogramAvatar from '@/components/features/subscriptions/MonogramAvatar';
+import DualCurrencyDisplay from '@/components/ui/DualCurrencyDisplay';
 
 interface SubscriptionComparisonProps {
   subscriptions: Subscription[];
@@ -64,7 +65,11 @@ const SubscriptionComparison: React.FC<SubscriptionComparisonProps> = ({ subscri
                       <span className="text-xs ml-2 text-gray-500">{subscription.billingCycle}</span>
                     </div>
                     <span className="font-semibold">
-                      {subscription.currency}{subscription.monthlyCost.toFixed(2)}
+                      <DualCurrencyDisplay 
+                        amount={subscription.monthlyCost} 
+                        currency={subscription.currency}
+                        size="sm"
+                      />
                       <span className="text-xs text-gray-500 ml-1">/mo</span>
                     </span>
                   </div>
@@ -94,8 +99,10 @@ const SubscriptionComparison: React.FC<SubscriptionComparisonProps> = ({ subscri
                 <div>
                   <span className="text-sm text-gray-500">Average cost per subscription</span>
                   <p className="font-medium">
-                    {subscriptionCosts[0].currency}
-                    {(subscriptionCosts.reduce((sum, sub) => sum + sub.monthlyCost, 0) / subscriptionCosts.length).toFixed(2)}
+                    <DualCurrencyDisplay 
+                      amount={subscriptionCosts.reduce((sum, sub) => sum + sub.monthlyCost, 0) / subscriptionCosts.length} 
+                      currency={subscriptionCosts[0].currency} 
+                    />
                     <span className="text-xs text-gray-500 ml-1">/mo</span>
                   </p>
                 </div>

@@ -1,26 +1,25 @@
 'use client';
 
 import React, { useMemo } from 'react';
-import { Subscription, Budget } from '@/utils/types';
-import { calculateMonthlySubscriptionCost } from '@/utils/firestore';
+import { Subscription } from '@/models/subscription/subscription.model';
+import { Budget } from '@/models/budget/budget.model';
 import { AlertTriangle } from 'lucide-react';
 
 interface BudgetUtilizationProps {
   subscriptions: Subscription[];
   budget: Budget | null;
+  totalMonthlySpending: number;
 }
 
-const BudgetUtilization: React.FC<BudgetUtilizationProps> = ({ subscriptions, budget }) => {
+const BudgetUtilization: React.FC<BudgetUtilizationProps> = ({ 
+  subscriptions, 
+  budget,
+  totalMonthlySpending 
+}) => {
   // Only include active subscriptions
   const activeSubscriptions = useMemo(() => 
     subscriptions.filter(sub => sub.status === 'active'),
     [subscriptions]
-  );
-
-  // Calculate monthly spending
-  const monthlySpending = useMemo(() => 
-    calculateMonthlySubscriptionCost(activeSubscriptions),
-    [activeSubscriptions]
   );
   
   // Get budget amount or use default
@@ -29,9 +28,9 @@ const BudgetUtilization: React.FC<BudgetUtilizationProps> = ({ subscriptions, bu
   
   // Calculate utilization percentage
   const utilizationPercentage = useMemo(() => {
-    const percentage = (monthlySpending / budgetAmount) * 100;
+    const percentage = (totalMonthlySpending / budgetAmount) * 100;
     return Math.min(percentage, 100); // Cap at 100% for the visual
-  }, [monthlySpending, budgetAmount]);
+  }, [totalMonthlySpending, budgetAmount]);
   
   // Determine status based on percentage
   const getBudgetStatus = () => {
@@ -120,7 +119,7 @@ const BudgetUtilization: React.FC<BudgetUtilizationProps> = ({ subscriptions, bu
             <div className="flex justify-between mb-2">
               <span className="text-sm text-gray-500">Monthly Spending</span>
               <span className="font-semibold">
-                {currency}{monthlySpending.toFixed(2)}
+                {currency}{totalMonthlySpending.toFixed(2)}
               </span>
             </div>
             
@@ -135,18 +134,18 @@ const BudgetUtilization: React.FC<BudgetUtilizationProps> = ({ subscriptions, bu
               <span className="text-sm text-gray-500">Remaining</span>
               <span 
                 className={`font-semibold ${
-                  (budgetAmount - monthlySpending) < 0 ? 'text-red-500' : ''
+                  (budgetAmount - totalMonthlySpending) < 0 ? 'text-red-500' : ''
                 }`}
               >
-                {currency}{Math.max(0, budgetAmount - monthlySpending).toFixed(2)}
+                {currency}{Math.max(0, budgetAmount - totalMonthlySpending).toFixed(2)}
               </span>
             </div>
             
-            {monthlySpending > budgetAmount && (
+            {totalMonthlySpending > budgetAmount && (
               <div className="flex justify-between text-red-500 mt-1">
                 <span className="text-sm">Overspent</span>
                 <span className="font-semibold">
-                  {currency}{(monthlySpending - budgetAmount).toFixed(2)}
+                  {currency}{(totalMonthlySpending - budgetAmount).toFixed(2)}
                 </span>
               </div>
             )}

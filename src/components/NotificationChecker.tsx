@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { getUserSettings, getUserSubscriptions } from '@/utils/firestore';
+import { useSubscriptionViewModel } from '@/viewmodels/subscription/subscription.viewmodel';
+import { useUserSettingsViewModel } from '@/viewmodels/user/user-settings.viewmodel';
 import { 
   checkSubscriptionRenewals, 
   getServiceWorkerRegistration,
@@ -16,6 +17,10 @@ import {
 const NotificationChecker = () => {
   const { user } = useAuth();
   const [serviceWorkerReg, setServiceWorkerReg] = useState<ServiceWorkerRegistration | null>(null);
+  
+  // Use viewmodels instead of direct service calls
+  const { subscriptions } = useSubscriptionViewModel(user?.uid || null);
+  const { settings } = useUserSettingsViewModel(user?.uid || null);
   
   // Function to get or update the service worker registration
   const updateServiceWorkerRegistration = useCallback(async () => {
@@ -41,23 +46,17 @@ const NotificationChecker = () => {
   
   // Check for subscription renewals
   useEffect(() => {
-    if (!user) return;
+    if (!user || !settings || !subscriptions) return;
     
     // Function to check for subscription renewals
     const checkRenewals = async () => {
       try {
-        // Get user's notification settings
-        const settings = await getUserSettings(user.uid);
-        
         // If notifications aren't enabled, don't do anything
-        if (!settings || !settings.notifications.enabled) return;
+        if (!settings.notifications.enabled) return;
         
         // Check if notification permission is granted
         const permissionStatus = getNotificationPermission();
         if (permissionStatus !== 'granted') return;
-        
-        // Get user's subscriptions
-        const subscriptions = await getUserSubscriptions(user.uid);
         
         // Send subscriptions and notification settings to service worker for checking
         // Get a fresh registration if needed
@@ -81,7 +80,7 @@ const NotificationChecker = () => {
     
     // Clean up interval on unmount
     return () => clearInterval(interval);
-  }, [user, serviceWorkerReg, updateServiceWorkerRegistration]);
+  }, [user, settings, subscriptions, serviceWorkerReg, updateServiceWorkerRegistration]);
   
   // This component doesn't render anything
   return null;

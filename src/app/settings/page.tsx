@@ -6,6 +6,8 @@ import Sidebar from '@/components/layout/Sidebar';
 import ProtectedRoute from '@/components/layout/ProtectedRoute';
 import BudgetSettings from '@/components/features/settings/BudgetSettings';
 import NotificationSettings from '@/components/features/settings/NotificationSettings';
+import CurrencySettings from '@/components/features/settings/CurrencySettings';
+import CurrencyPreferencesSettings from '@/components/features/settings/CurrencyPreferencesSettings';
 
 export default function SettingsPage() {
   return (
@@ -24,6 +26,12 @@ export default function SettingsPage() {
             <div className="grid gap-6">
               {/* Budget Settings Card */}
               <BudgetSettings />
+              
+              {/* Currency Preferences Settings Card */}
+              <CurrencyPreferencesSettings />
+              
+              {/* Currency Exchange API Settings Card */}
+              <CurrencySettings />
               
               {/* Notification Settings Card */}
               <NotificationSettings />
