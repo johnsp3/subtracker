@@ -1,18 +1,19 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { ChevronDown, ChevronUp, Bell, BellOff } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToastContext } from '@/contexts/ToastContext';
 import MonogramAvatar from './MonogramAvatar';
 import { useSubscriptionViewModel } from '@/viewmodels/subscription/subscription.viewmodel';
+import { VirtualizedList } from '@/components/ui/VirtualizedList';
+import { SubscriptionDisplay } from '@/models/subscription/subscription.model';
 
 /**
  * UpcomingSubscriptions Component
  * 
  * Displays a list of upcoming subscription payments organized by timeframe.
- * Following the MVVM pattern, this component only handles UI rendering and user interaction,
- * while business logic is delegated to the subscription view model.
+ * Uses virtualization for better performance with long lists.
  */
 const UpcomingSubscriptions = () => {
   const { user, loading: authLoading } = useAuth();
@@ -54,14 +55,50 @@ const UpcomingSubscriptions = () => {
    * @param id - The subscription ID
    * @param event - The click event
    */
-  const handleToggleNotification = async (id: string, event: React.MouseEvent) => {
+  const handleToggleNotification = useCallback(async (id: string, event: React.MouseEvent) => {
     event.stopPropagation();
     const success = await toggleNotification(id);
     
     if (success) {
       toast.showSuccess('Notification settings updated');
     }
-  };
+  }, [toggleNotification, toast]);
+
+  // Render an individual subscription item (memoized to prevent unnecessary rerenders)
+  const renderSubscriptionItem = useMemo(() => (subscription: SubscriptionDisplay, index: number) => (
+    <div 
+      key={subscription.id} 
+      className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg transition-colors"
+    >
+      <div className="flex items-center gap-4">
+        <div className="w-12 h-12 rounded-lg overflow-hidden">
+          <MonogramAvatar name={subscription.logo || subscription.name} />
+        </div>
+        <div>
+          <h4 className="font-medium">{subscription.name}</h4>
+          <div className="flex items-center gap-2 mt-1">
+            <span className="text-sm px-2 py-0.5 bg-gray-100 rounded-full">{subscription.category}</span>
+            <span className="text-sm text-gray-500">{subscription.nextPayment}</span>
+          </div>
+        </div>
+      </div>
+      <div className="flex items-center gap-4">
+        <button 
+          onClick={(e) => handleToggleNotification(subscription.id, e)}
+          className="text-gray-400 hover:text-primary transition-colors"
+        >
+          {subscription.notificationsEnabled ? (
+            <Bell size={18} />
+          ) : (
+            <BellOff size={18} />
+          )}
+        </button>
+        <div className="font-medium text-right">
+          {subscription.amount}
+        </div>
+      </div>
+    </div>
+  ), [handleToggleNotification]);
 
   // If still in authentication loading state or component loading state, show loading spinner
   if (authLoading || loading) {
@@ -113,38 +150,15 @@ const UpcomingSubscriptions = () => {
               </div>
 
               {expandedDay === timeframe && (
-                <div className="space-y-4 mt-4">
-                  {timeframeSubscriptions.map((subscription) => (
-                    <div key={subscription.id} className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg transition-colors">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-lg overflow-hidden">
-                          <MonogramAvatar name={subscription.logo || subscription.name} />
-                        </div>
-                        <div>
-                          <h4 className="font-medium">{subscription.name}</h4>
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className="text-sm px-2 py-0.5 bg-gray-100 rounded-full">{subscription.category}</span>
-                            <span className="text-sm text-gray-500">{subscription.nextPayment}</span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <button 
-                          onClick={(e) => handleToggleNotification(subscription.id, e)}
-                          className="text-gray-400 hover:text-primary transition-colors"
-                        >
-                          {subscription.notificationsEnabled ? (
-                            <Bell size={18} />
-                          ) : (
-                            <BellOff size={18} />
-                          )}
-                        </button>
-                        <div className="font-medium text-right">
-                          {subscription.amount}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                <div className="mt-4">
+                  {/* Use virtualization for lists that might grow large */}
+                  <VirtualizedList
+                    data={timeframeSubscriptions}
+                    height={Math.min(400, timeframeSubscriptions.length * 90)} // Dynamic height based on items
+                    itemHeight={90} // Height of each subscription item
+                    renderItem={renderSubscriptionItem}
+                    emptyMessage="No upcoming payments in this timeframe"
+                  />
                 </div>
               )}
             </div>

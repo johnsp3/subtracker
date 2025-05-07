@@ -81,7 +81,6 @@ export default function RootLayout({
                     `}} />
                   </div>
                   {children}
-                  <DebugInfo />
                 </CurrencyProvider>
               </NotificationProvider>
             </ToastProvider>

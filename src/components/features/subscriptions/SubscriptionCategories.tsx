@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Tv, Music, ShoppingBag, Lightbulb, Car, Home, Gamepad2, MoreHorizontal } from 'lucide-react';
-import { SubscriptionCategory } from '@/models/subscription/subscription.model';
+import { Subscription, SubscriptionCategory } from '@/models/subscription/subscription.model';
 import { useSubscriptionViewModel } from '@/viewmodels/subscription/subscription.viewmodel';
 import { useBudgetViewModel } from '@/viewmodels/budget/budget.viewmodel';
 import DualCurrencyDisplay from '@/components/ui/DualCurrencyDisplay';
@@ -16,6 +16,12 @@ type CategoryWithIcon = {
   color: string;
 };
 
+/**
+ * SubscriptionCategories Component
+ * 
+ * Displays subscription categories with their totals and budget information.
+ * Uses extensive memoization for optimal performance.
+ */
 const SubscriptionCategories = () => {
   const { user, loading: authLoading } = useAuth();
   const [categories, setCategories] = useState<CategoryWithIcon[]>([]);
@@ -48,11 +54,12 @@ const SubscriptionCategories = () => {
     'Other': { icon: <MoreHorizontal size={18} />, color: 'bg-gray-500' }
   }), []);
 
+  // Process subscriptions and compute categories - heavily memoized to prevent recalculation
   const processSubscriptions = useCallback(() => {
     if (!subscriptions) return;
     
     // Group subscriptions by category
-    const categoryGroups: Record<SubscriptionCategory, any[]> = {} as Record<SubscriptionCategory, any[]>;
+    const categoryGroups: Record<SubscriptionCategory, Subscription[]> = {} as Record<SubscriptionCategory, Subscription[]>;
     
     // Initialize all categories
     Object.keys(categoryMappings).forEach(cat => {
@@ -60,7 +67,7 @@ const SubscriptionCategories = () => {
     });
     
     // Group subscriptions
-    subscriptions.forEach(sub => {
+    subscriptions.forEach((sub: Subscription) => {
       if (categoryGroups[sub.category]) {
         categoryGroups[sub.category].push(sub);
       } else {
@@ -117,6 +124,7 @@ const SubscriptionCategories = () => {
     });
   }, [subscriptions, budget, calculateTotalMonthlyCost, categoryMappings]);
 
+  // Only process data when needed
   useEffect(() => {
     // If auth is loading (including during logout), reset component state
     if (authLoading) {
@@ -152,9 +160,72 @@ const SubscriptionCategories = () => {
     processSubscriptions
   ]);
 
-  const getBudgetPercentage = () => {
+  // Memoize the budget percentage calculation
+  const getBudgetPercentage = useMemo(() => {
     return ((totals.subscriptions / totals.budget) * 100).toFixed(1);
-  };
+  }, [totals.subscriptions, totals.budget]);
+  
+  // Memoize the entire categories list rendering to prevent rerenders
+  const categoriesList = useMemo(() => {
+    if (categories.length === 0) {
+      return (
+        <div className="text-center py-4 text-gray-500">
+          No subscriptions added yet
+        </div>
+      );
+    }
+    
+    return (
+      <div className="space-y-4">
+        {categories.map((category) => (
+          <div 
+            key={category.name} 
+            className="relative z-10 flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg transition-colors overflow-hidden"
+            style={{ position: 'relative' }}
+          >
+            <div className="flex items-center gap-3">
+              <div className={`w-8 h-8 rounded-lg ${category.color} flex items-center justify-center text-white`}>
+                {category.icon}
+              </div>
+              <div>
+                <h3 className="font-medium">{category.name}</h3>
+                <p className="text-sm text-gray-500">{category.count} subscriptions</p>
+              </div>
+            </div>
+            <div className="font-medium">
+              {category.amount}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }, [categories]);
+  
+  // Memoize the budget summary section
+  const budgetSummary = useMemo(() => {
+    return (
+      <div className="mt-6 pt-6 border-t border-gray-100">
+        <div className="flex justify-between items-center">
+          <div>
+            <p className="text-sm text-gray-500">Monthly Budget</p>
+            <p className="text-xl font-bold mt-1">
+              <DualCurrencyDisplay amount={totals.budget} currency={budget?.currency || '€'} />
+            </p>
+          </div>
+          <div>
+            <p className="text-sm text-gray-500">Total Subscriptions</p>
+            <p className="text-xl font-bold mt-1">
+              <DualCurrencyDisplay amount={totals.subscriptions} currency={budget?.currency || '€'} />
+            </p>
+          </div>
+        </div>
+        <div className="mt-4 bg-gray-100 h-2 rounded-full overflow-hidden">
+          <div className="bg-primary h-full" style={{ width: `${getBudgetPercentage}%` }}></div>
+        </div>
+        <p className="text-sm text-gray-500 mt-2">You're spending {getBudgetPercentage}% of your monthly budget on subscriptions</p>
+      </div>
+    );
+  }, [totals, budget, getBudgetPercentage]);
   
   // Show loading spinner if any data is still loading
   if (authLoading || subscriptionsLoading || budgetLoading) {
@@ -174,55 +245,8 @@ const SubscriptionCategories = () => {
         <button className="text-primary text-sm font-medium hover:text-opacity-80 transition-colors">Edit</button>
       </div>
       
-      {categories.length === 0 ? (
-        <div className="text-center py-4 text-gray-500">
-          No subscriptions added yet
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {categories.map((category) => (
-            <div 
-              key={category.name} 
-              className="relative z-10 flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg transition-colors overflow-hidden"
-              style={{ position: 'relative' }}
-            >
-              <div className="flex items-center gap-3">
-                <div className={`w-8 h-8 rounded-lg ${category.color} flex items-center justify-center text-white`}>
-                  {category.icon}
-                </div>
-                <div>
-                  <h3 className="font-medium">{category.name}</h3>
-                  <p className="text-sm text-gray-500">{category.count} subscriptions</p>
-                </div>
-              </div>
-              <div className="font-medium">
-                {category.amount}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-      
-      <div className="mt-6 pt-6 border-t border-gray-100">
-        <div className="flex justify-between items-center">
-          <div>
-            <p className="text-sm text-gray-500">Monthly Budget</p>
-            <p className="text-xl font-bold mt-1">
-              <DualCurrencyDisplay amount={totals.budget} currency={budget?.currency || '€'} />
-            </p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-500">Total Subscriptions</p>
-            <p className="text-xl font-bold mt-1">
-              <DualCurrencyDisplay amount={totals.subscriptions} currency={budget?.currency || '€'} />
-            </p>
-          </div>
-        </div>
-        <div className="mt-4 bg-gray-100 h-2 rounded-full overflow-hidden">
-          <div className="bg-primary h-full" style={{ width: `${getBudgetPercentage()}%` }}></div>
-        </div>
-        <p className="text-sm text-gray-500 mt-2">You're spending {getBudgetPercentage()}% of your monthly budget on subscriptions</p>
-      </div>
+      {categoriesList}
+      {budgetSummary}
     </div>
   );
 };

@@ -15,4 +15,10 @@ export * from './budget/budget.viewmodel';
 export * from './user/user-settings.viewmodel';
 
 // Export auth view models
-export * from './auth/auth.viewmodel'; 
+export * from './auth/auth.viewmodel';
+
+// Export currency view models
+export * from './currency/currency.viewmodel';
+
+// Export transaction view models
+export * from './transaction/transaction.viewmodel'; 

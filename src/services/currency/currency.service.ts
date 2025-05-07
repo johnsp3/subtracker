@@ -26,6 +26,11 @@ import { createError, ErrorType } from '@/services/error/error.service';
 const DEFAULT_PROVIDER = ExchangeRateProvider.EXCHANGE_RATE_API;
 
 /**
+ * LocalStorage key for active provider
+ */
+const ACTIVE_PROVIDER_STORAGE_KEY = 'activeCurrencyProvider';
+
+/**
  * Initialize the currency service with provider configurations
  * 
  * @param configs - Map of provider configurations by provider type
@@ -43,7 +48,18 @@ export const initializeCurrencyService = async (
     }
   });
   
-  // Auto-select a working provider
+  // Check if there's a saved provider preference
+  if (typeof window !== 'undefined') {
+    const savedProvider = localStorage.getItem(ACTIVE_PROVIDER_STORAGE_KEY);
+    
+    if (savedProvider && factory.hasProvider(savedProvider as ExchangeRateProvider)) {
+      // Use the saved provider if it's available
+      factory.setActiveProvider(savedProvider as ExchangeRateProvider);
+      return;
+    }
+  }
+  
+  // Otherwise auto-select a working provider
   await factory.autoSelectProvider();
 };
 
@@ -59,7 +75,13 @@ export const setActiveCurrencyProvider = (provider: ExchangeRateProvider): void 
     throw new Error(`Provider ${provider} has not been initialized`);
   }
   
+  // Set the active provider in the factory
   factory.setActiveProvider(provider);
+  
+  // Save the active provider to localStorage for persistence
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(ACTIVE_PROVIDER_STORAGE_KEY, provider);
+  }
 };
 
 /**
@@ -120,7 +142,7 @@ export const getLatestExchangeRates = async (
         try {
           const result = await factory.getProvider(altProvider).getLatestRates(base, symbols);
           // If successful, set this provider as active
-          factory.setActiveProvider(altProvider);
+          setActiveCurrencyProvider(altProvider); // Use our function to ensure it's also saved to localStorage
           console.log(`Switched to alternate provider: ${altProvider}`);
           return result;
         } catch (altError) {
@@ -175,7 +197,7 @@ export const convertCurrency = async (
         try {
           const result = await factory.getProvider(altProvider).convertCurrency(amount, from, to);
           // If successful, set this provider as active
-          factory.setActiveProvider(altProvider);
+          setActiveCurrencyProvider(altProvider); // Use our function to ensure it's also saved to localStorage
           console.log(`Switched to alternate provider: ${altProvider}`);
           return result;
         } catch (altError) {
