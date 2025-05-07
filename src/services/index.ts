@@ -13,6 +13,7 @@ export * from './subscription/subscription.service';
 
 // Export billing services
 export * from './billing/billing.service';
+export * from './billing/billing-automation.service';
 
 // Export budget services
 export * from './budget/budget.service';

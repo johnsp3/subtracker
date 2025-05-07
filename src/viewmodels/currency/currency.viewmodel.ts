@@ -59,7 +59,6 @@ export interface CurrencyState {
  * Default display names for providers
  */
 const PROVIDER_DISPLAY_NAMES: Record<ExchangeRateProvider, string> = {
-  [ExchangeRateProvider.FIXER]: 'Fixer.io',
   [ExchangeRateProvider.EXCHANGE_RATE_API]: 'ExchangeRate-API'
 };
 

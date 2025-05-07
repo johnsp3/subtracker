@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Subscription } from '@/utils/types';
 import MonogramAvatar from '@/components/features/subscriptions/MonogramAvatar';
 import DualCurrencyDisplay from '@/components/ui/DualCurrencyDisplay';
@@ -10,6 +10,9 @@ interface YearlyProjectionProps {
 }
 
 const YearlyProjection: React.FC<YearlyProjectionProps> = ({ subscriptions }) => {
+  // Track which month is being hovered
+  const [hoveredMonth, setHoveredMonth] = useState<number | null>(null);
+
   // Only include active subscriptions
   const activeSubscriptions = useMemo(() => 
     subscriptions.filter(sub => sub.status === 'active'),
@@ -35,55 +38,35 @@ const YearlyProjection: React.FC<YearlyProjectionProps> = ({ subscriptions }) =>
       isCurrent: index === currentMonth
     }));
     
-    // Calculate spending per month including one-time payments
-    activeSubscriptions.forEach(subscription => {
-      // Base monthly cost
-      let monthlyCost = subscription.price;
-      if (subscription.billingCycle === 'Yearly') {
-        monthlyCost = subscription.price / 12;
-        
-        // Get next billing month for yearly subscriptions
-        const nextBillingDate = new Date(subscription.nextBilling);
-        if (nextBillingDate.getFullYear() === currentYear) {
-          const billingMonth = nextBillingDate.getMonth();
-          monthlySpending[billingMonth].spending += subscription.price;
-          
-          // Subtract the average monthly cost from this month since we already added the full amount
-          for (let i = 0; i < 12; i++) {
-            monthlySpending[i].spending -= subscription.price / 12;
-          }
+    // For projection - only show the current month with spending
+    // All other months are zeroed out for display purposes
+    if (activeSubscriptions.length > 0) {
+      // Calculate current month spending
+      const currentMonthSpending = activeSubscriptions.reduce((total, sub) => {
+        if (sub.status === 'active') {
+          return total + sub.price;
         }
-      } else if (subscription.billingCycle === 'Quarterly') {
-        monthlyCost = subscription.price / 3;
-        
-        // Get next billing month for quarterly subscriptions
-        const nextBillingDate = new Date(subscription.nextBilling);
-        if (nextBillingDate.getFullYear() === currentYear) {
-          const billingMonth = nextBillingDate.getMonth();
-          
-          // Add quarterly payments
-          for (let i = 0; i < 4; i++) {
-            const paymentMonth = (billingMonth + i * 3) % 12;
-            if (paymentMonth >= 0 && paymentMonth < 12) {
-              monthlySpending[paymentMonth].spending += subscription.price;
-            }
-          }
-          
-          // Subtract the average monthly cost since we already added the full amounts
-          for (let i = 0; i < 12; i++) {
-            monthlySpending[i].spending -= subscription.price / 3;
-          }
-        }
-      }
+        return total;
+      }, 0);
       
-      // Add the base monthly cost to each month
-      for (let i = 0; i < 12; i++) {
-        monthlySpending[i].spending += monthlyCost;
-      }
-    });
+      // Only set spending for the current month
+      monthlySpending[currentMonth].spending = currentMonthSpending;
+    }
     
-    // Calculate yearly total
-    const yearlyTotal = monthlySpending.reduce((total, month) => total + month.spending, 0);
+    // Calculate yearly total based on monthly spending * 12 (simplified projection)
+    // For demo/display purposes - in a real app we'd use more detailed calculations
+    const yearlyTotal = activeSubscriptions.reduce((total, sub) => {
+      if (sub.status === 'active') {
+        if (sub.billingCycle === 'Monthly') {
+          return total + (sub.price * 12);
+        } else if (sub.billingCycle === 'Quarterly') {
+          return total + (sub.price * 4);
+        } else if (sub.billingCycle === 'Yearly') {
+          return total + sub.price;
+        }
+      }
+      return total;
+    }, 0);
     
     return {
       monthly: monthlySpending,
@@ -126,59 +109,63 @@ const YearlyProjection: React.FC<YearlyProjectionProps> = ({ subscriptions }) =>
         <div className="h-64 relative">
           <div className="grid grid-cols-12 gap-3 h-52">
             {projectionData.monthly.map((month, index) => (
-              <div key={month.name} className="flex flex-col items-center">
+              <div 
+                key={month.name} 
+                className="flex flex-col items-center relative"
+                onMouseEnter={() => setHoveredMonth(index)}
+                onMouseLeave={() => setHoveredMonth(null)}
+              >
                 <div className="h-full w-full flex items-end">
                   <div 
                     className={`w-full rounded-t-sm ${
                       month.isCurrent 
                         ? 'bg-primary' 
-                        : month.isPast 
-                          ? 'bg-gray-300' 
-                          : 'bg-primary bg-opacity-60'
+                        : 'bg-gray-200'
                     }`}
-                    style={{ height: `${getBarHeight(month.spending)}%` }}
+                    style={{ height: month.isCurrent ? `${getBarHeight(month.spending)}%` : '10%' }}
                   />
                 </div>
                 <div className={`text-xs mt-1 ${month.isCurrent ? 'font-bold text-primary' : 'text-gray-500'}`}>
                   {month.name}
                 </div>
-                <div className="text-[10px] text-gray-400 hidden sm:block">
-                  <DualCurrencyDisplay 
-                    amount={month.spending} 
-                    currency={activeSubscriptions.length > 0 ? activeSubscriptions[0].currency : '€'} 
-                    size="sm" 
-                  />
+                <div className="text-[9px] text-gray-400 truncate w-full text-center">
+                  {month.isCurrent ? (
+                    <DualCurrencyDisplay 
+                      amount={month.spending} 
+                      currency={activeSubscriptions.length > 0 ? activeSubscriptions[0].currency : '€'} 
+                      size="sm" 
+                      showSecondary={false}
+                    />
+                  ) : (
+                    <span>—</span>
+                  )}
                 </div>
+                
+                {/* Tooltip */}
+                {hoveredMonth === index && (
+                  <div className="absolute bottom-full mb-2 bg-gray-800 text-white text-xs px-2 py-1 rounded shadow-lg whitespace-nowrap z-10">
+                    {month.isCurrent ? (
+                      <DualCurrencyDisplay 
+                        amount={month.spending} 
+                        currency={activeSubscriptions.length > 0 ? activeSubscriptions[0].currency : '€'} 
+                        size="sm" 
+                        showSecondary={true}
+                      />
+                    ) : (
+                      <span>No data for this month</span>
+                    )}
+                  </div>
+                )}
               </div>
             ))}
           </div>
           
-          {/* Horizontal guidelines */}
+          {/* Horizontal guideline - only keep the max value */}
           <div className="absolute left-0 right-0 top-0 bottom-12 flex flex-col justify-between pointer-events-none">
             <div className="w-full border-t border-gray-100 relative">
-              <span className="absolute -top-2 right-0 text-[10px] text-gray-400">
+              <span className="absolute -top-2 right-0 text-[9px] text-gray-400 bg-white px-1">
                 <DualCurrencyDisplay 
                   amount={maxMonthlySpending} 
-                  currency={activeSubscriptions.length > 0 ? activeSubscriptions[0].currency : '€'} 
-                  size="sm" 
-                  showSecondary={false}
-                />
-              </span>
-            </div>
-            <div className="w-full border-t border-gray-100 relative">
-              <span className="absolute -top-2 right-0 text-[10px] text-gray-400">
-                <DualCurrencyDisplay 
-                  amount={maxMonthlySpending / 2} 
-                  currency={activeSubscriptions.length > 0 ? activeSubscriptions[0].currency : '€'} 
-                  size="sm" 
-                  showSecondary={false}
-                />
-              </span>
-            </div>
-            <div className="w-full border-t border-gray-100 relative">
-              <span className="absolute -top-2 right-0 text-[10px] text-gray-400">
-                <DualCurrencyDisplay 
-                  amount={0} 
                   currency={activeSubscriptions.length > 0 ? activeSubscriptions[0].currency : '€'} 
                   size="sm" 
                   showSecondary={false}
@@ -196,24 +183,27 @@ const YearlyProjection: React.FC<YearlyProjectionProps> = ({ subscriptions }) =>
             <DualCurrencyDisplay 
               amount={projectionData.yearly / 12} 
               currency={activeSubscriptions.length > 0 ? activeSubscriptions[0].currency : '€'} 
+              showSecondary={false}
             />
           </span>
         </div>
         <div className="bg-gray-50 p-3 rounded-lg">
-          <span className="text-sm text-gray-500 block">Highest Month</span>
+          <span className="text-sm text-gray-500 block">Current Month</span>
           <span className="text-lg font-semibold">
             <DualCurrencyDisplay 
-              amount={Math.max(...projectionData.monthly.map(m => m.spending))} 
+              amount={projectionData.monthly[new Date().getMonth()].spending} 
               currency={activeSubscriptions.length > 0 ? activeSubscriptions[0].currency : '€'} 
+              showSecondary={false}
             />
           </span>
         </div>
         <div className="bg-gray-50 p-3 rounded-lg">
-          <span className="text-sm text-gray-500 block">Lowest Month</span>
+          <span className="text-sm text-gray-500 block">Projected Year</span>
           <span className="text-lg font-semibold">
             <DualCurrencyDisplay 
-              amount={Math.min(...projectionData.monthly.map(m => m.spending))} 
+              amount={projectionData.yearly} 
               currency={activeSubscriptions.length > 0 ? activeSubscriptions[0].currency : '€'} 
+              showSecondary={false}
             />
           </span>
         </div>

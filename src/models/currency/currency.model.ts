@@ -12,7 +12,6 @@
  * Supported external API providers for currency exchange rates
  */
 export enum ExchangeRateProvider {
-  FIXER = 'fixer',
   EXCHANGE_RATE_API = 'exchangerate-api'
 }
 

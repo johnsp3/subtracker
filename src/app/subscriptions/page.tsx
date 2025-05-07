@@ -21,6 +21,7 @@ import {
 } from '@/utils/types';
 import MonogramAvatar from '@/components/features/subscriptions/MonogramAvatar';
 import DualCurrencyDisplay from '@/components/ui/DualCurrencyDisplay';
+import ProcessDueBillings from '@/components/features/billing/ProcessDueBillings';
 import { generateMonogram, generateBackgroundColor } from '@/utils/avatar';
 
 type NewSubscriptionForm = {
@@ -261,6 +262,23 @@ export default function SubscriptionsPage() {
     }
   };
 
+  // Handle billing process completion
+  const handleBillingProcessComplete = async (processedIds: string[], newBillingRecords: BillingRecord[]) => {
+    if (processedIds.length > 0) {
+      try {
+        // Refresh subscriptions to get updated next billing dates
+        const updatedSubscriptions = await getUserSubscriptions(user?.uid || '');
+        setSubscriptions(updatedSubscriptions);
+        
+        // Refresh billing history with new records
+        const updatedBillingHistory = await getUserBillingHistory(user?.uid || '');
+        setBillingHistory(updatedBillingHistory);
+      } catch (error) {
+        console.error('Error refreshing data after billing process:', error);
+      }
+    }
+  };
+
   // Loading state
   if (loading) {
     return (
@@ -494,6 +512,12 @@ export default function SubscriptionsPage() {
               <div className="bg-white rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
                 <h2 className="text-xl font-bold mb-6">Billing History</h2>
                 
+                {/* Add the process due billings component */}
+                <ProcessDueBillings 
+                  subscriptions={subscriptions} 
+                  onProcessComplete={handleBillingProcessComplete} 
+                />
+                
                 {billingHistory.length === 0 ? (
                   <div className="text-center py-6">
                     <p className="text-gray-500">No billing history available.</p>
@@ -512,9 +536,15 @@ export default function SubscriptionsPage() {
                       <tbody>
                         {billingHistory.map((record) => (
                           <tr key={record.id} className="border-b border-gray-100 last:border-none hover:bg-gray-50 transition-colors">
-                            <td className="py-4">{record.date}</td>
+                            <td className="py-4">{new Date(record.date).toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              year: 'numeric'
+                            })}</td>
                             <td className="py-4">{record.subscriptionName}</td>
-                            <td className="py-4">{record.currency}{record.amount.toFixed(2)}</td>
+                            <td className="py-4">
+                              <DualCurrencyDisplay amount={record.amount} currency={record.currency} />
+                            </td>
                             <td className="py-4">
                               <span 
                                 className={`px-2 py-1 rounded-full text-xs font-medium ${

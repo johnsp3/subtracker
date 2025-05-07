@@ -10,7 +10,6 @@ import {
   ICurrencyProvider,
   CurrencyProviderConfig
 } from './currency-provider.interface';
-import { FixerProvider } from './fixer-provider';
 import { ExchangeRateApiProvider } from './exchange-rate-api-provider';
 
 /**
@@ -48,9 +47,6 @@ export class CurrencyProviderFactory {
     
     // Create the provider instance based on type
     switch (provider) {
-      case ExchangeRateProvider.FIXER:
-        providerInstance = new FixerProvider(config);
-        break;
       case ExchangeRateProvider.EXCHANGE_RATE_API:
         providerInstance = new ExchangeRateApiProvider(config);
         break;
