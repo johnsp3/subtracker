@@ -9,6 +9,7 @@ import { CurrencyProvider } from '@/contexts/CurrencyContext';
 import ErrorBoundary from '@/components/layout/ErrorBoundary';
 import CurrencyServiceInitializer from '@/components/ui/CurrencyServiceInitializer';
 import { useState, useEffect } from 'react';
+import { migrateCurrencyProviders } from '@/utils/migrate-currency-providers';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -24,6 +25,9 @@ function DebugInfo() {
     // Log browser information for debugging
     console.log('User Agent:', navigator.userAgent);
     console.log('Window Size:', window.innerWidth, 'x', window.innerHeight);
+    
+    // Migrate currency providers to remove deprecated ones
+    migrateCurrencyProviders();
   }, []);
   
   // Only show in development

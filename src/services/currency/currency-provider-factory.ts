@@ -51,7 +51,9 @@ export class CurrencyProviderFactory {
         providerInstance = new ExchangeRateApiProvider(config);
         break;
       default:
-        throw new Error(`Unknown provider type: ${provider}`);
+        // Instead of throwing an error for unknown providers, log a warning and fallback to default
+        console.warn(`Unknown provider type: ${provider}. Falling back to ExchangeRate-API provider.`);
+        providerInstance = new ExchangeRateApiProvider(config);
     }
     
     // Store the provider in the map
